@@ -1,6 +1,6 @@
 [package]
 name = "ressa"
-version = "0.7.1"
+version = "0.8.0"
 authors = ["Robert Masen <r@robertmasen.pizza>"]
 repository = "https://github.com/FreeMasen/RESSA"
 description = "An ECMAscript parser"
@@ -11,7 +11,7 @@ categories = ["parsing", "text-processing", "web-programming"]
 edition = "2018"
 
 [dependencies]
-ress = "0.9.1"
+ress = "0.11.0"
 resast = "0.4"
 log = "0.4"
 backtrace = "0"
@@ -21,6 +21,7 @@ rayon = { version = "1", optional = true }
 pulldown-cmark = { version = "0.7", optional = true }
 res-regex = "0.1"
 hash-chain = "0.3"
+in-and-out-logger = { path = "./crates/in_and_out_logger"}
 
 [features]
 default = []

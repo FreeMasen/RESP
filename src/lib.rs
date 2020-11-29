@@ -81,6 +81,7 @@ use std::{
     collections::{HashMap, HashSet},
     mem::replace,
 };
+type RessItem<'a> = Item<&'a str>;
 
 /// The current configuration options.
 /// This will most likely increase over time
@@ -121,7 +122,7 @@ struct Context<'a> {
     allow_super_call: bool,
     /// If we have found any possible naming errors
     /// which are not yet resolved
-    first_covert_initialized_name_error: Option<Item<Token<&'a str>>>,
+    first_covert_initialized_name_error: Option<RessItem<'a>>,
     /// If the current expressions is an assignment target
     is_assignment_target: bool,
     /// If the current expression is a binding element
@@ -156,6 +157,7 @@ struct Context<'a> {
 }
 
 impl Default for Config {
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn default() -> Self {
         trace!("default config");
         Self { tolerant: false }
@@ -284,17 +286,17 @@ pub struct Parser<'a, CH> {
     /// `ress` crate for more details)
     scanner: Scanner<'a>,
     /// The next item,
-    look_ahead: Item<Token<&'a str>>,
+    look_ahead: RessItem<'a>,
     /// Since we are looking ahead, we need
     /// to make sure we don't miss the eof
     /// by using this flag
     found_eof: bool,
     /// a possible container for tokens, currently
     /// it is unused
-    _tokens: Vec<Item<Token<&'a str>>>,
+    _tokens: Vec<RessItem<'a>>,
     /// a possible container for comments, currently
     /// it is unused
-    _comments: Vec<Item<Token<&'a str>>>,
+    _comments: Vec<RessItem<'a>>,
     /// The current position we are parsing
     current_position: Position,
     look_ahead_position: Position,
@@ -427,6 +429,7 @@ where
     }
     /// Parse all of the directives into a single prologue
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_directive_prologues(&mut self) -> Res<Vec<ProgramPart<'b>>> {
         debug!(
             "{}: parse_directive_prologues {:?}",
@@ -443,6 +446,7 @@ where
     }
     /// Parse a single directive
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_directive(&mut self) -> Res<ProgramPart<'b>> {
         debug!(
             "{}: parse_directive {:?}",
@@ -473,6 +477,7 @@ where
                 if self.context.strict && self.context.found_directive_octal_escape {
                     return Err(Error::OctalLiteral(orig.location.start));
                 }
+                debug!("Consuming Semi");
                 self.consume_semicolon()?;
                 Ok(ProgramPart::Dir(Dir {
                     dir: s.clone_inner(),
@@ -483,6 +488,7 @@ where
             }
         } else {
             let stmt = ProgramPart::Stmt(Stmt::Expr(expr));
+            debug!("Consuming Semi");
             self.consume_semicolon()?;
             Ok(stmt)
         }
@@ -492,6 +498,7 @@ where
     /// statement or declaration (import/export/function/const/let/class)
     /// otherwise we move on to `Parser::parse_statement`
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_statement_list_item(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<ProgramPart<'b>> {
         debug!("{}: parse_statement_list_item", self.look_ahead.span.start);
         self.context.is_assignment_target = true;
@@ -572,6 +579,7 @@ where
     /// import 'place';
     /// ```
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_import_decl(&mut self) -> Res<ModImport<'b>> {
         if let Some(scope) = self.context.lexical_names.last_scope() {
             if !scope.is_top() {
@@ -639,6 +647,7 @@ where
     /// import {Thing} from 'place';
     /// ```
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_named_imports(&mut self) -> Res<Vec<ImportSpecifier<'b>>> {
         self.expect_punct(Punct::OpenBrace)?;
         let mut ret = Vec::new();
@@ -653,6 +662,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_import_specifier(&mut self) -> Res<ImportSpecifier<'b>> {
         let start = self.look_ahead_position;
         let (imported, local) = if self.look_ahead.token.is_ident() {
@@ -687,6 +697,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_import_namespace_specifier(&mut self) -> Res<ImportSpecifier<'b>> {
         self.expect_punct(Punct::Asterisk)?;
         if !self.at_contextual_keyword("as") {
@@ -702,6 +713,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_import_default_specifier(&mut self) -> Res<ImportSpecifier<'b>> {
         let start = self.look_ahead_position;
         let ident = self.parse_ident_name()?;
@@ -712,6 +724,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_export_decl(&mut self) -> Res<ModExport<'b>> {
         debug!("{} parse_export_decl", self.look_ahead_position);
         if let Some(scope) = self.context.lexical_names.last_scope() {
@@ -864,6 +877,7 @@ where
         }
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_export_decl_func(&mut self, is_default: bool) -> Res<ModExport<'b>> {
         let start = self.look_ahead_position;
         let func = self.parse_function_decl(true)?;
@@ -880,6 +894,7 @@ where
         }
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_export_decl_class(&mut self, is_default: bool) -> Res<ModExport<'b>> {
         let start = self.look_ahead_position;
         let class = self.parse_class_decl(true, true)?;
@@ -897,6 +912,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_export_specifier(&mut self) -> Res<ExportSpecifier<'b>> {
         let local = self.parse_ident_name()?;
         let exported = if self.at_contextual_keyword("as") {
@@ -909,6 +925,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_module_specifier(&mut self) -> Res<Lit<'b>> {
         let item = self.next_item()?;
         match &item.token {
@@ -927,6 +944,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_statement(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_statement {:?}",
@@ -1033,6 +1051,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_with_stmt(&mut self) -> Res<WithStmt<'b>> {
         debug!(
             "{}: parse_with_stmt {:?}",
@@ -1074,6 +1093,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_while_stmt(&mut self) -> Res<WhileStmt<'b>> {
         debug!(
             "{}: parse_while_stmt {:?}",
@@ -1109,6 +1129,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_var_stmt(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_var_stmt {:?}",
@@ -1123,6 +1144,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_var_decl_list(&mut self, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
         debug!(
             "{} parse_var_decl_list {:?}",
@@ -1151,6 +1173,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_var_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
         let (_, patt) = self.parse_pattern(Some(VarKind::Var), &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&patt) {
@@ -1180,6 +1203,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_try_stmt(&mut self) -> Res<TryStmt<'b>> {
         debug!(
             "{}: parse_try_stmt {:?}",
@@ -1224,6 +1248,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_catch_clause(&mut self) -> Res<CatchClause<'b>> {
         debug!(
             "{}: parse_catch_clause {:?}",
@@ -1282,6 +1307,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_finally_clause(&mut self) -> Res<BlockStmt<'b>> {
         debug!(
             "{}: parse_finally_clause {:?}",
@@ -1292,6 +1318,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_throw_stmt(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_throw_stmt {:?}",
@@ -1307,6 +1334,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_switch_stmt(&mut self) -> Res<SwitchStmt<'b>> {
         debug!(
             "{}: parse_switch_stmt {:?}",
@@ -1345,6 +1373,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_switch_case(&mut self) -> Res<SwitchCase<'b>> {
         debug!(
             "{}: parse_switch_case {:?}",
@@ -1372,6 +1401,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_return_stmt(&mut self) -> Res<Option<Expr<'b>>> {
         debug!(
             "{}: parse_return_stmt {:?}",
@@ -1398,6 +1428,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_if_stmt(&mut self) -> Res<IfStmt<'b>> {
         debug!(
             "{}: parse_if_stmt {:?}",
@@ -1445,6 +1476,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_if_clause(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_if_clause {:?}",
@@ -1457,6 +1489,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_fn_stmt(&mut self, decl_pos: bool) -> Res<Func<'b>> {
         debug!(
             "{}: parse_fn_stmt {:?} {}",
@@ -1474,6 +1507,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_for_stmt(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_for_stmt {:?}",
@@ -1709,6 +1743,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_for_loop(&mut self, kind: VarKind) -> Res<ForStmt<'b>> {
         debug!(
             "{}: parse_for_loop {:?}",
@@ -1724,6 +1759,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_for_loop_cont(&mut self, init: Option<LoopInit<'b>>) -> Res<ForStmt<'b>> {
         debug!(
             "{}: parse_for_loop_cont {:?}",
@@ -1755,6 +1791,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_for_in_loop(&mut self, left: LoopLeft<'b>) -> Res<ForInStmt<'b>> {
         debug!(
             "{}: parse_for_in_loop {:?}",
@@ -1805,6 +1842,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_for_of_loop(&mut self, left: LoopLeft<'b>, is_await: bool) -> Res<ForOfStmt<'b>> {
         debug!(
             "{}: parse_for_of_loop {:?}",
@@ -1837,6 +1875,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_loop_body(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_loop_body {:?}",
@@ -1853,6 +1892,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_do_while_stmt(&mut self) -> Res<DoWhileStmt<'b>> {
         debug!(
             "{}: parse_do_while_stmt {:?}",
@@ -1881,6 +1921,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_break_stmt(&mut self, _s: &'b str) -> Res<Option<resast::Ident<'b>>> {
         debug!(
             "{}: parse_break_stmt {:?}",
@@ -1890,6 +1931,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_continue_stmt(&mut self, _s: &'b str) -> Res<Option<resast::Ident<'b>>> {
         debug!(
             "{}: parse_continue_stmt {:?}",
@@ -1899,6 +1941,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_optionally_labeled_statement(
         &mut self,
         k: Keyword<()>,
@@ -1941,6 +1984,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_debugger_stmt(&mut self, _s: &'b str) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_debugger_stmt {:?}",
@@ -1952,6 +1996,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_labelled_statement(&mut self) -> Res<Stmt<'b>> {
         debug!("parse_labelled_statement, {:?}", self.look_ahead.token);
         let start = self.look_ahead.span;
@@ -2019,6 +2064,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_expression_statement(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_expression_statement {:?}",
@@ -2068,6 +2114,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_expression {:?}",
@@ -2094,6 +2141,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_block(&mut self, new_scope: bool) -> Res<BlockStmt<'b>> {
         debug!(
             "{}: parse_block {:?}",
@@ -2130,6 +2178,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_lexical_decl(&mut self, in_for: bool) -> Res<Decl<'b>> {
         debug!(
             "{}: parse_lexical_decl {:?}",
@@ -2151,6 +2200,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_binding_list(&mut self, kind: VarKind, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
         debug!(
             "{}: parse_binding_list {:?}",
@@ -2182,6 +2232,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_variable_decl_list(&mut self, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
         debug!(
             "{} parse_variable_decl_list in_for: {}",
@@ -2198,6 +2249,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_variable_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
         debug!(
             "{} parse_variable_decl in_for: {}",
@@ -2224,14 +2276,13 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_pat_ident(pat: &Pat) -> bool {
-        match pat {
-            Pat::Ident(_) => true,
-            _ => false,
-        }
+        matches!(pat, Pat::Ident(_))
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_lexical_binding(&mut self, kind: VarKind, in_for: bool) -> Res<VarDecl<'b>> {
         debug!(
             "{}: parse_lexical_binding {:?}",
@@ -2270,6 +2321,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_restricted(id: &Pat) -> bool {
         match id {
             Pat::Ident(ref ident) => ident.name == "eval" || ident.name == "arguments",
@@ -2278,6 +2330,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_function_decl(&mut self, opt_ident: bool) -> Res<Func<'b>> {
         debug!(
             "{}: parse_function_decl {:?}",
@@ -2291,9 +2344,7 @@ where
             false
         };
         self.expect_keyword(Keyword::Function(()))?;
-        let is_gen = if is_async {
-            false
-        } else {
+        let is_gen = {
             let is_gen = self.at_punct(Punct::Asterisk);
             if is_gen {
                 let _ = self.next_item()?;
@@ -2383,6 +2434,7 @@ where
         })
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_func(
         &mut self,
         is_stmt: bool,
@@ -2499,15 +2551,18 @@ where
 
         Ok(f)
     }
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn remove_scope(&mut self) {
         trace!("{} remove_scope", self.look_ahead.span.start);
         self.context.lexical_names.remove_child();
     }
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn add_scope(&mut self, scope: lexical_names::Scope) {
         trace!("{} add_scope {:?}", self.look_ahead.span.start, scope);
         self.context.lexical_names.new_child(scope);
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_func_params(&mut self) -> Res<FormalParams<'b>> {
         let start = self.look_ahead_position;
         let formal_params = self.parse_formal_params()?;
@@ -2526,6 +2581,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_function_source_el(&mut self) -> Res<FuncBody<'b>> {
         debug!(
             "{}: parse_function_source_el {:?}",
@@ -2556,6 +2612,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_class_decl(&mut self, opt_ident: bool, check_id: bool) -> Res<Class<'b>> {
         debug!(
             "{}: parse_class_decl {:?}",
@@ -2619,6 +2676,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_class_body(&mut self) -> Res<ClassBody<'b>> {
         debug!(
             "{}: parse_class_body {:?}",
@@ -2641,6 +2699,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_class_el(&mut self, has_ctor: bool) -> Res<(bool, Prop<'b>)> {
         debug!(
             "{}: parse_class_el {:?}",
@@ -2810,6 +2869,7 @@ where
     /// match, this takes into account all of the
     /// different shapes that `key` could be, including
     /// identifiers and literals
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_key(key: &PropKey, other: &str) -> bool {
         match key {
             PropKey::Lit(ref l) => match l {
@@ -2831,6 +2891,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_generator(val: &PropValue) -> bool {
         match val {
             PropValue::Expr(ref e) => match e {
@@ -2843,6 +2904,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_static(key: &PropKey) -> bool {
         match key {
             PropKey::Lit(ref l) => match l {
@@ -2864,6 +2926,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_async_property_method(&mut self) -> Res<PropValue<'b>> {
         debug!(
             "{}: parse_property_method_async_fn",
@@ -2896,6 +2959,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_property_method(&mut self) -> Res<PropValue<'b>> {
         debug!(
             "{}: parse_property_method {:?}",
@@ -2928,6 +2992,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_generator_method(&mut self) -> Res<PropValue<'b>> {
         debug!(
             "{}: pares_generator_method {:?}",
@@ -2959,6 +3024,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_getter_method(&mut self) -> Res<PropValue<'b>> {
         debug!(
             "{}: parse_getter_method {:?}",
@@ -2992,6 +3058,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<FuncBody<'b>> {
         debug!(
             "{}: parse_method_body {:?}",
@@ -3017,6 +3084,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_setter_method(&mut self) -> Res<PropValue<'b>> {
         debug!(
             "{}: parse_setter_method {:?}",
@@ -3053,20 +3121,16 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_rest(arg: &FuncArg) -> bool {
         match arg {
-            FuncArg::Expr(ref e) => match e {
-                Expr::Spread(_) => true,
-                _ => false,
-            },
-            FuncArg::Pat(ref p) => match p {
-                Pat::RestElement(_) => true,
-                _ => false,
-            },
+            FuncArg::Expr(ref e) => matches!(e, Expr::Spread(_)),
+            FuncArg::Pat(ref p) => matches!(p, Pat::RestElement(_)),
         }
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_property_method_body(
         &mut self,
         simple: bool,
@@ -3099,6 +3163,7 @@ where
         Ok(ret)
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn qualified_prop_name(tok: &Token<&str>) -> bool {
         debug!("qualified_prop_name",);
         tok.is_ident()
@@ -3108,6 +3173,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_object_property_key(&mut self) -> Res<PropKey<'b>> {
         debug!(
             "{}: parse_object_property_key {:?}",
@@ -3192,6 +3258,7 @@ where
         }
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn octal_literal_guard_string(&self, has_octal: bool, pos: Position) -> Res<()> {
         if self.context.strict && has_octal {
             return Err(Error::OctalLiteral(pos));
@@ -3199,6 +3266,7 @@ where
         Ok(())
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn octal_literal_guard(&mut self, span: &Span) -> Res<()> {
         if self.context.strict {
             let mut chars = self.get_string(span)?.chars();
@@ -3219,6 +3287,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_valid_property_key_lit(expr: &Expr) -> bool {
         match expr {
             Expr::Lit(ref l) => match l {
@@ -3230,6 +3299,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_primary_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_primary_expression {:?}",
@@ -3259,6 +3329,7 @@ where
                 Ok(Expr::ident_from(self.get_string(&ident.span)?))
             }
         } else if self.look_ahead.token.is_number() || self.look_ahead.token.is_string() {
+            debug!("found number or string");
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
             let item = self.next_item()?;
@@ -3275,6 +3346,7 @@ where
                     Lit::number_from(inner)
                 }
                 Token::String(sl) => {
+                    debug!("found string!");
                     let inner = match sl {
                         ress::prelude::StringLit::Single(ref s) => {
                             self.octal_literal_guard_string(
@@ -3334,7 +3406,10 @@ where
                 Token::RegEx(r) => {
                     let flags = if let Some(f) = r.flags { f } else { "" };
                     let re = resast::prelude::RegEx::from(&r.body, flags);
-                    crate::regex::validate_regex(self.get_string(&regex.span)?)?;
+                    crate::regex::validate_regex(
+                        regex.location.start,
+                        self.get_string(&regex.span)?,
+                    )?;
                     re
                 }
                 _ => unreachable!(),
@@ -3393,6 +3468,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_group_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_group_expr {:?}",
@@ -3499,6 +3575,7 @@ where
         }
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn convert_expr_to_func_arg_strict(&self, expr: Expr<'b>) -> Res<FuncArg<'b>> {
         if !self.context.strict {
             return Ok(FuncArg::Expr(expr));
@@ -3518,6 +3595,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_array_init(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_array_init {:?}",
@@ -3550,6 +3628,7 @@ where
         Ok(Expr::Array(elements))
     }
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_obj_init(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_obj_init {:?}",
@@ -3591,6 +3670,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_obj_prop(&mut self) -> Res<(bool, ObjProp<'b>)> {
         debug!(
             "{}: parse_obj_prop {:?}",
@@ -3764,6 +3844,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_proto_(key: &PropKey) -> bool {
         trace!("is_proto {:?}", key);
         match key {
@@ -3782,6 +3863,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn at_possible_ident(&self) -> bool {
         self.look_ahead.token.is_ident()
             || self.look_ahead.token.is_keyword()
@@ -3794,6 +3876,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_template_lit(&mut self, is_tagged: bool) -> Res<TemplateLit<'b>> {
         debug!(
             "{}: parse_template_Lit {:?}",
@@ -3821,6 +3904,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_template_element(&mut self, is_tagged: bool) -> Res<TemplateElement<'b>> {
         debug!(
             "{}: parse_template_element {:?}",
@@ -3854,6 +3938,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_function_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_function_expr {:?}",
@@ -3952,6 +4037,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_fn_name(&mut self, is_gen: bool) -> Res<resast::Ident<'b>> {
         debug!(
             "{}: parse_fn_name {:?}",
@@ -3965,6 +4051,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_ident_name(&mut self) -> Res<resast::Ident<'b>> {
         debug!(
             "{}: parse_ident_name {:?}",
@@ -3981,6 +4068,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_var_ident(&mut self, is_var: bool) -> Res<resast::Ident<'b>> {
         debug!(
             "{}: parse_var_ident {:?}",
@@ -4039,6 +4127,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_formal_params(&mut self) -> Res<FormalParams<'b>> {
         debug!(
             "{}: parse_formal_params {:?}",
@@ -4074,13 +4163,14 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_formal_param(&mut self, simple: bool) -> Res<(bool, bool, FuncArg<'b>)> {
         debug!(
             "{}: parse_formal_param {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
         let start = self.look_ahead_position;
-        let mut params: Vec<Item<Token<&'b str>>> = Vec::new();
+        let mut params: Vec<RessItem<'b>> = Vec::new();
         let (found_restricted, param) = if self.at_punct(Punct::Ellipsis) {
             self.parse_rest_element(&mut params)?
         } else {
@@ -4097,10 +4187,8 @@ where
     }
 
     #[inline]
-    fn parse_rest_element(
-        &mut self,
-        params: &mut Vec<Item<Token<&'b str>>>,
-    ) -> Res<(bool, Pat<'b>)> {
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
+    fn parse_rest_element(&mut self, params: &mut Vec<RessItem<'b>>) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_rest_element {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -4118,10 +4206,8 @@ where
     }
 
     #[inline]
-    fn parse_binding_rest_el(
-        &mut self,
-        params: &mut Vec<Item<Token<&'b str>>>,
-    ) -> Res<(bool, Pat<'b>)> {
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
+    fn parse_binding_rest_el(&mut self, params: &mut Vec<RessItem<'b>>) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_binding_rest_el {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -4132,9 +4218,10 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_pattern_with_default(
         &mut self,
-        params: &mut Vec<Item<Token<&'b str>>>,
+        params: &mut Vec<RessItem<'b>>,
     ) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_pattern_with_default {:?}",
@@ -4161,10 +4248,11 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_pattern(
         &mut self,
         kind: Option<VarKind>,
-        params: &mut Vec<Item<Token<&'b str>>>,
+        params: &mut Vec<RessItem<'b>>,
     ) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_pattern {:?}",
@@ -4198,9 +4286,10 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_array_pattern(
         &mut self,
-        params: &mut Vec<Item<Token<&'b str>>>,
+        params: &mut Vec<RessItem<'b>>,
         _kind: VarKind,
     ) -> Res<(bool, Pat<'b>)> {
         debug!(
@@ -4232,6 +4321,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_object_pattern(&mut self) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_object_pattern {:?}",
@@ -4255,6 +4345,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_rest_prop(&mut self) -> Res<ObjPatPart<'b>> {
         debug!(
             "{}: parse_rest_prop {:?}",
@@ -4274,6 +4365,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_property_pattern(&mut self) -> Res<ObjPatPart<'b>> {
         debug!(
             "{}: parse_property_pattern {:?}",
@@ -4323,6 +4415,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_assignment_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_assignment_expr {:?}",
@@ -4440,6 +4533,7 @@ where
             Ok(current)
         }
     }
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_assignment_after_start(&mut self, start: Expr<'b>) -> Res<AssignExpr<'b>> {
         if self.context.strict && Self::is_ident(&start) {
             if let Expr::Ident(ref i) = start {
@@ -4497,6 +4591,7 @@ where
     }
     /// Check if an arg is a strict mode restricted identifier
     /// returns true if the arg _is_ an error
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn check_arg_strict_mode(arg: &FuncArg<'b>) -> bool {
         match arg {
             FuncArg::Expr(Expr::Ident(ref ident)) | FuncArg::Pat(Pat::Ident(ref ident)) => {
@@ -4507,6 +4602,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_async(expr: &Expr) -> bool {
         match expr {
             Expr::Func(ref f) => f.is_async,
@@ -4516,6 +4612,7 @@ where
         }
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn assignment_operator(p: Punct) -> Option<AssignOp> {
         match p {
             Punct::Equal => Some(AssignOp::Equal),
@@ -4536,6 +4633,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_arrow_param_placeholder(expr: &Expr) -> bool {
         match expr {
             Expr::ArrowParamPlaceHolder(_, _) => true,
@@ -4545,6 +4643,7 @@ where
     /// Returns a pair with first element indicating
     /// that an argument is not simple and the second
     /// being the formalized arguments list
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn reinterpret_as_cover_formals_list(
         &mut self,
         expr: Expr<'b>,
@@ -4698,6 +4797,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_await(arg: &FuncArg) -> bool {
         match arg {
             FuncArg::Expr(ref e) => match e {
@@ -4712,6 +4812,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_assignment(arg: &FuncArg) -> bool {
         match arg {
             FuncArg::Pat(ref p) => match p {
@@ -4725,6 +4826,7 @@ where
         }
     }
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     pub fn is_simple(arg: &FuncArg) -> bool {
         match arg {
             FuncArg::Pat(ref p) => match p {
@@ -4739,6 +4841,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_invalid_await(arg: &FuncArg) -> bool {
         match arg {
             FuncArg::Expr(Expr::Assign(AssignExpr { right, .. }))
@@ -4762,6 +4865,7 @@ where
         }
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn reinterpret_expr_as_pat(&self, ex: Expr<'b>) -> Res<Pat<'b>> {
         debug!(
             "{}: reinterpret_expr_as_pat {:?}",
@@ -4821,6 +4925,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_reinterpret_target(ex: &Expr) -> bool {
         match ex {
             Expr::Ident(_) => true,
@@ -4836,6 +4941,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn reinterpret_prop(&self, p: Prop<'b>) -> Res<Prop<'b>> {
         let Prop {
             key,
@@ -4877,6 +4983,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_yield_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_yield_expr {:?}",
@@ -4905,6 +5012,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_conditional_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_conditional_expr {:?}",
@@ -4940,6 +5048,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_binary_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_binary_expression {:?}",
@@ -5050,6 +5159,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_exponentiation_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_exponentiation_expression",
@@ -5084,6 +5194,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_unary_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_unary_expression {:?} allow_await: {}",
@@ -5125,6 +5236,7 @@ where
         }
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn unary_operator(token: &Token<&str>) -> Option<UnaryOp> {
         match token {
             Token::Punct(ref p) => match p {
@@ -5144,6 +5256,7 @@ where
         }
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn binary_operator(token: &Token<&str>) -> Option<BinaryOp> {
         match token {
             Token::Keyword(ref key) => match key {
@@ -5177,6 +5290,7 @@ where
         }
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn logical_operator(token: &Token<&str>) -> Option<LogicalOp> {
         match token {
             Token::Punct(ref p) => match p {
@@ -5189,6 +5303,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_await_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_await_expr {:?}",
@@ -5203,6 +5318,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_update_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_update_expr {:?}",
@@ -5282,6 +5398,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_func_decl(stmt: &Stmt) -> bool {
         if let Stmt::Expr(Expr::Func(_)) = stmt {
             true
@@ -5291,6 +5408,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_labeled_func(stmt: &Stmt) -> bool {
         match stmt {
             Stmt::Labeled(stmt) => {
@@ -5301,6 +5419,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_ident(expr: &Expr) -> bool {
         match expr {
             Expr::Ident(_) => true,
@@ -5309,6 +5428,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_left_hand_side_expr(&mut self) -> Res<Expr<'b>> {
         if !self.context.allow_in {
             return Err(Error::InvalidUseOfContextualKeyword(
@@ -5373,6 +5493,7 @@ where
     ///
     /// > note: This will handle any invalid super expression
     /// scenarios
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_super(&mut self) -> Res<Expr<'b>> {
         let super_position = self.look_ahead_position;
         if !self.context.allow_super {
@@ -5392,6 +5513,7 @@ where
     }
 
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_left_hand_side_expr_allow_call(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_left_hand_side_expr_allow_call",
@@ -5414,6 +5536,7 @@ where
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             ret
         };
+
         loop {
             if self.at_punct(Punct::Period) {
                 self.context.is_binding_element = false;
@@ -5474,10 +5597,12 @@ where
             }
         }
         self.context.allow_in = prev_in;
+        debug!("Returning expr: {:?}", expr);
         Ok(expr)
     }
     /// Parse the arguments of an async function
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_async_args(&mut self) -> Res<Vec<Expr<'b>>> {
         debug!(
             "{}: parse_async_args {:?}",
@@ -5522,6 +5647,7 @@ where
     /// Parse an argument of an async function
     /// note: not sure this is needed
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_async_arg(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_async_arg {:?}",
@@ -5535,6 +5661,7 @@ where
     /// if parsing with tolerance we can tolerate
     /// a non-existent comma
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn expect_comma_sep(&mut self) -> Res<()> {
         debug!(
             "{}: expect_comma_sep {:?}",
@@ -5545,6 +5672,7 @@ where
 
     /// Parse an expression preceded by the `...` operator
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_spread_element(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_spread_element {:?}",
@@ -5558,6 +5686,7 @@ where
     }
     /// Parse function arguments, expecting to open with `(` and close with `)`
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_args(&mut self) -> Res<Vec<Expr<'b>>> {
         debug!(
             "{}: parse_args {:?}",
@@ -5592,6 +5721,7 @@ where
     /// or `new.target`. The later is only valid in a function
     /// body
     #[inline]
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_new_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_new_expr {:?}",
@@ -5688,7 +5818,7 @@ where
         &mut self,
         prev_bind: bool,
         prev_assign: bool,
-        prev_first: Option<Item<Token<&'b str>>>,
+        prev_first: Option<RessItem<'b>>,
     ) -> Res<()> {
         if let Some(ref _e) = prev_first {
             //FIXME this needs to do something
@@ -5702,7 +5832,7 @@ where
     /// Get the context state in order to isolate this state from the
     /// following operation
     #[inline]
-    fn isolate_cover_grammar(&mut self) -> (bool, bool, Option<Item<Token<&'b str>>>) {
+    fn isolate_cover_grammar(&mut self) -> (bool, bool, Option<RessItem<'b>>) {
         debug!(
             "{}: isolate_cover_grammar {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -5714,7 +5844,7 @@ where
         ret
     }
     /// Get the context state for cover grammar operations
-    fn get_cover_grammar_state(&self) -> (bool, bool, Option<Item<Token<&'b str>>>) {
+    fn get_cover_grammar_state(&self) -> (bool, bool, Option<RessItem<'b>>) {
         (
             self.context.is_binding_element,
             self.context.is_assignment_target,
@@ -5727,7 +5857,7 @@ where
         &mut self,
         is_binding_element: bool,
         is_assignment: bool,
-        first_covert_initialized_name_error: Option<Item<Token<&'b str>>>,
+        first_covert_initialized_name_error: Option<RessItem<'b>>,
     ) {
         self.context.is_binding_element = self.context.is_binding_element && is_binding_element;
         self.context.is_assignment_target = self.context.is_assignment_target && is_assignment;
@@ -5737,7 +5867,7 @@ where
     }
     /// Capture the context state for a binding_element, assignment and
     /// first_covert_initialized_name
-    fn inherit_cover_grammar(&mut self) -> (bool, bool, Option<Item<Token<&'b str>>>) {
+    fn inherit_cover_grammar(&mut self) -> (bool, bool, Option<RessItem<'b>>) {
         trace!("inherit_cover_grammar");
         let ret = self.get_cover_grammar_state();
         self.context.is_binding_element = true;
@@ -5748,11 +5878,16 @@ where
     /// Request the next token from the scanner
     /// swap the last look ahead with this new token
     /// and return the last token
-    fn next_item(&mut self) -> Res<Item<Token<&'b str>>> {
-        trace!("next_item {}", self.context.has_line_term);
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
+    fn next_item(&mut self) -> Res<RessItem<'b>> {
+        trace!(
+            "next_item {}, next: {:?}",
+            self.context.has_line_term,
+            self.look_ahead
+        );
         let mut comment_line_term = false;
         loop {
-            self.context.has_line_term = comment_line_term || self.scanner.pending_new_line;
+            self.context.has_line_term = comment_line_term || self.scanner.has_pending_new_line();
             if let Some(look_ahead) = self.scanner.next() {
                 let look_ahead = look_ahead?;
                 if cfg!(feature = "debug_look_ahead") {
@@ -5985,7 +6120,7 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         if self.at_contextual_keyword("async") {
-            !self.scanner.pending_new_line
+            !self.scanner.has_pending_new_line()
                 && if let Some(peek) = self.scanner.look_ahead() {
                     if let Ok(peek) = peek {
                         peek.token.matches_keyword(Keyword::Function(()))
@@ -6090,7 +6225,6 @@ where
     }
 
     #[inline]
-    #[inline]
     fn at_big_int_flag(&self) -> bool {
         let Span { start, end } = self.look_ahead.span;
         &self.original[start..end] == "n"
@@ -6102,7 +6236,7 @@ where
             .ok_or_else(|| self.op_error("Unable to get &str from scanner"))
     }
 
-    fn expected_token_error<T>(&self, item: &Item<Token<&'b str>>, expectation: &[&str]) -> Res<T> {
+    fn expected_token_error<T>(&self, item: &Item<&'b str>, expectation: &[&str]) -> Res<T> {
         if cfg!(feature = "error_backtrace") {
             let bt = backtrace::Backtrace::new();
             error!("{:?}", bt);
@@ -6125,7 +6259,7 @@ where
             format!("Expected {}; found {:?}", expectation, item.token),
         ))
     }
-    fn unexpected_token_error<T>(&self, item: &Item<Token<&'b str>>, msg: &str) -> Res<T> {
+    fn unexpected_token_error<T>(&self, item: &RessItem<'b>, msg: &str) -> Res<T> {
         if cfg!(feature = "error_backtrace") {
             let bt = backtrace::Backtrace::new();
             error!("{:?}", bt);
@@ -6175,6 +6309,7 @@ where
         self.look_ahead.location
     }
 
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn next_part(&mut self) -> Res<ProgramPart<'b>> {
         trace!(
             "next_part past_prolog: {}, strict: {}",
@@ -6228,6 +6363,7 @@ where
     CH: CommentHandler<'b> + Sized,
 {
     type Item = Res<ProgramPart<'b>>;
+    #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn next(&mut self) -> Option<Self::Item> {
         if self.look_ahead.token.is_eof() || self.context.errored {
             None
